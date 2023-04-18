@@ -1,5 +1,5 @@
 import json
-from engine import Engine
+from load_model import Engine
 from tqdm import tqdm
 import numpy as np
 from scipy.special import softmax

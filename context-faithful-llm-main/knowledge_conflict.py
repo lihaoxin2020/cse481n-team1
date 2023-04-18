@@ -2,7 +2,7 @@ import json
 import re
 import argparse
 from tqdm import tqdm
-from engine import Engine
+from load_model import Engine
 from evaluation import get_score
 
 

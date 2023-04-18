@@ -48,11 +48,15 @@ def main():
     parser.add_argument("--num_demos", default=16, type=int)
     parser.add_argument("--log_path", default='', type=str)
     parser.add_argument("--outfile", default='', type=str)
+    parser.add_argument("--max_examples", default=100, type=int, help="-1 to use the whole dataset")
     args = parser.parse_args()
     with open(args.orig_path, 'r') as fh:
         orig_examples = json.load(fh)
     with open(args.counter_path, 'r') as fh:
         counter_examples = json.load(fh)
+    if (args.max_examples > 0):
+        orig_examples = orig_examples[:args.max_examples]
+        counter_examples = counter_examples[:args.max_examples]
     print('Loaded {} instances.'.format(len(counter_examples)))
     engine = Engine(args.engine)
 

@@ -1,4 +1,9 @@
-from transformers import AutoTokenizer, OPTForCausalLM
+from transformers import (
+    AutoTokenizer, 
+    OPTForCausalLM, 
+    LlamaTokenizer,
+    LlamaForCausalLM,
+    )
 import torch.nn.functional as F
 import torch
 
@@ -23,10 +28,24 @@ opt_dic = {
 
 class Engine:
     def __init__(self, model_name):
+        if model_name.startswith("alpaca"):
+            self.engine = model_name
+            self.tokenizer = LlamaTokenizer.from_pretrained("chainyo/alpaca-lora-7b")
+            self.model = LlamaForCausalLM.from_pretrained(
+                "chainyo/alpaca-lora-7b",
+                load_in_8bit=True,
+                torch_dtype=torch.float16,
+                device_map="auto",
+            ).to(device)
+
         if model_name.startswith("opt"):
             self.engine = model_name
             self.tokenizer = AutoTokenizer.from_pretrained(opt_dic[model_name])
             self.model = OPTForCausalLM.from_pretrained(opt_dic[model_name]).to(device)
+
+        if torch.__version__ >= "2":
+            self.model = torch.compile(self.model)
+        self.model.eval()
 
     def check_prompt_length(self, prompt, max_tokens=64):
         prompt_length = len(self.tokenizer.encode(prompt))

@@ -64,7 +64,7 @@ def main():
     gold_answers, pred_answers, orig_answers = [], [], []
     for oe, ce in tqdm(zip(orig_examples, counter_examples), total=len(orig_examples)):
         if step % 100 == 0:
-            eval(pred_answers, orig_answers, gold_answers)
+            eval(pred_answers, orig_answers, gold_answers, outfile)
         step += 1
         query, context, answer = ce['question'], ce['context'], ce['answer']
         orig_answer = oe['answer']

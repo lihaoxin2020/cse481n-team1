@@ -1,4 +1,4 @@
-from transformers import AutoTokenizer, OPTModel
+from transformers import AutoTokenizer, OPTForCausalLM
 import torch.nn.functional as F
 import torch
 
@@ -23,13 +23,14 @@ opt_dic = {
 
 class Engine:
     def __init__(self, model_name):
-        if model_name.starts_with("opt"):
+        if model_name.startswith("opt"):
+            self.engine = model_name
             self.tokenizer = AutoTokenizer.from_pretrained(opt_dic[model_name])
-            self.model = OPTModel.from_pretrained(opt_dic[model_name]).to(device)
+            self.model = OPTForCausalLM.from_pretrained(opt_dic[model_name]).to(device)
 
     def check_prompt_length(self, prompt, max_tokens=64):
         prompt_length = len(self.tokenizer.encode(prompt))
-        if prompt_length + max_tokens >= length_limit[self.engine]:  # Prompt is too long
+        if prompt_length + max_tokens >= 2048:  # Prompt is too long
             return True
         return False
 

@@ -31,21 +31,23 @@ def qa_to_prompt(query, context, schema, demos=[], num_demos=16):
     prompt = prompt + get_prompt(query, context, schema=schema)
     return prompt
 
-def eval(pred_answers, orig_answers, gold_answers):
+def eval(pred_answers, orig_answers, gold_answers, outfile):
     em, ps = get_score(pred_answers, gold_answers)
     _, po = get_score(pred_answers, orig_answers)
     mr = po / (ps + po + 1e-10) * 100
-    print('ps {}, po {}, mr {}, em {}.'.format(ps, po, mr, em))
+    with open(outfile, "a") as f:
+        print('ps {}, po {}, mr {}, em {}.'.format(ps, po, mr, em), file=f)
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--orig_path", default="./datasets/nq/orig_dev_filtered.json", type=str)
     parser.add_argument("--counter_path", default="./datasets/nq/conflict_dev_filtered.json", type=str)
-    parser.add_argument("--engine", default="text-davinci-003", type=str)
+    parser.add_argument("--engine", default="opt-1.3b", type=str)
     parser.add_argument("--schema", default="base", type=str, help="Choose from the following prompting templates: base, attr, instr, opin, instr+opin.")
     parser.add_argument("--demo_mode", default="none", help="Choose from the following demonstrations: none, original, counter.")
     parser.add_argument("--num_demos", default=16, type=int)
     parser.add_argument("--log_path", default='', type=str)
+    parser.add_argument("--outfile", default='', type=str)
     args = parser.parse_args()
     with open(args.orig_path, 'r') as fh:
         orig_examples = json.load(fh)
@@ -53,6 +55,10 @@ def main():
         counter_examples = json.load(fh)
     print('Loaded {} instances.'.format(len(counter_examples)))
     engine = Engine(args.engine)
+
+    outfile = args.outfile
+    with open(outfile, "a") as f:
+        print(args.engine, args.schema, args.demo_mode, args.num_demos, file=f)
 
     step = 0
     gold_answers, pred_answers, orig_answers = [], [], []
@@ -90,7 +96,7 @@ def main():
     if args.log_path:
         with open(args.log_path, 'w') as fh:
             json.dump(counter_examples, fh)
-    eval(pred_answers, orig_answers, gold_answers)
+    eval(pred_answers, orig_answers, gold_answers, outfile)
 
 if __name__ == '__main__':
     main()

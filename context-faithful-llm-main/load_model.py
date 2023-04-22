@@ -1,8 +1,10 @@
 from transformers import (
-    AutoTokenizer, 
-    OPTForCausalLM, 
+    AutoTokenizer,
+    OPTForCausalLM,
     LlamaTokenizer,
     LlamaForCausalLM,
+    T5Tokenizer,
+    T5ForConditionalGeneration
     )
 import torch.nn.functional as F
 import torch
@@ -26,6 +28,22 @@ opt_dic = {
     "opt-66b": "facebook/opt-66b"
 }
 
+t5_dic = {
+"t5-small": "t5-small",
+"t5-base" : "t5-base",
+"t5-large": "t5-large",
+"t5-3b" : "t5-3b",
+"t5-11b" : "t5-11b"
+}
+
+flan_t5_dic = {
+"google/flan-t5-small": "google/flan-t5-small",
+"google/flan-t5-base" : "google/flan-t5-base",
+"google/flan-t5-large": "google/flan-t5-large",
+"google/flan-t5-xl" : "google/flan-t5-xl",
+"google/flan-t5-xxl" : "google/flan-t5-xxl"
+}
+
 class Engine:
     def __init__(self, model_name):
         if model_name.startswith("alpaca"):
@@ -38,22 +56,28 @@ class Engine:
                 device_map="auto",
             ).to(device)
 
+        if model_name.startswith("t5"):
+            self.engine = model_name
+            self.tokenizer = T5Tokenizer.from_pretrained(t5_dic[model_name])
+            self.model = T5ForConditionalGeneration.from_pretrained(t5_dic[model_name]).to(device)
+
+        if model_name.startswith("google/flan-t5"):
+            self.engine = model_name
+            self.tokenizer = T5Tokenizer.from_pretrained(flan_t5_dic[model_name], truncation=True, model_max_length=5642)
+            self.model = T5ForConditionalGeneration.from_pretrained(flan_t5_dic[model_name]).to(device)
+
         if model_name.startswith("opt"):
             self.engine = model_name
-            self.tokenizer = AutoTokenizer.from_pretrained(opt_dic[model_name])
+            self.tokenizer = AutoTokenizer.from_pretrained(opt_dic[model_name], truncation=True, model_max_length=3189)
             self.model = OPTForCausalLM.from_pretrained(opt_dic[model_name]).to(device)
 
         if torch.__version__ >= "2":
             self.model = torch.compile(self.model)
         self.model.eval()
 
-    def check_prompt_length(self, prompt, max_tokens=64):
-        prompt_length = len(self.tokenizer.encode(prompt))
-        if prompt_length + max_tokens >= 2048:  # Prompt is too long
-            return True
-        return False
 
     def complete(self, prompt, max_tokens=64):
+
         input_ids = self.tokenizer.encode(prompt, return_tensors="pt").to(device)
 
         with torch.no_grad():
@@ -63,6 +87,20 @@ class Engine:
         output_text = self.tokenizer.decode(output_ids[0], skip_special_tokens=True)
         completed_text = output_text[len(prompt):].lstrip()
         return completed_text
+
+    def check_prompt_length(self, prompt, max_tokens=64):
+
+        if (self.engine.startswith("t5-small")):
+          prompt_length = len(self.tokenizer.encode(prompt))
+          if prompt_length + max_tokens >= 3189:  # Prompt is too long
+              return True
+          return False
+
+
+        prompt_length = len(self.tokenizer.encode(prompt))
+        if prompt_length + max_tokens >= 2048:  # Prompt is too long
+            return True
+        return False
 
     def get_prob(self, prompt, num_tokens):
         input_ids = self.tokenizer.encode(prompt, return_tensors="pt").to(device)

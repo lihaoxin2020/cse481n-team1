@@ -1,0 +1,6 @@
+/context-faithful-llm-main/.cache/
+/offload/
+/datasets/
+
+*.txt
+*.log

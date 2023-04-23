@@ -49,7 +49,12 @@ def main():
     parser.add_argument("--log_path", default='', type=str)
     parser.add_argument("--outfile", default='', type=str)
     parser.add_argument("--max_examples", default=100, type=int, help="-1 to use the whole dataset")
+    parser.add_argument("--pred_file", default='', type=str, help="Prediction logging file")
+
     args = parser.parse_args()
+    if args.pred_file:
+        log = open(args.pred_file, 'a')
+
     with open(args.orig_path, 'r') as fh:
         orig_examples = json.load(fh)
     with open(args.counter_path, 'r') as fh:
@@ -97,9 +102,15 @@ def main():
         ce['orig_answer'] = orig_answer
         ce['schema'] = args.schema
         ce['demo_mode'] = args.demo_mode
+
+        if args.pred_file:
+            print('prediction: ', pred, file=log)
+            print('orig_answer: ', orig_answer, file=log)
     if args.log_path:
         with open(args.log_path, 'w') as fh:
             json.dump(counter_examples, fh)
+
+    log.close()
     eval(pred_answers, orig_answers, gold_answers, outfile)
 
 if __name__ == '__main__':

@@ -29,19 +29,19 @@ opt_dic = {
 }
 
 t5_dic = {
-"t5-small": "t5-small",
-"t5-base" : "t5-base",
-"t5-large": "t5-large",
-"t5-3b" : "t5-3b",
-"t5-11b" : "t5-11b"
+    "t5-small": "t5-small",
+    "t5-base" : "t5-base",
+    "t5-large": "t5-large",
+    "t5-3b"   : "t5-3b",
+    "t5-11b"  : "t5-11b"
 }
 
 flan_t5_dic = {
-"google/flan-t5-small": "google/flan-t5-small",
-"google/flan-t5-base" : "google/flan-t5-base",
-"google/flan-t5-large": "google/flan-t5-large",
-"google/flan-t5-xl" : "google/flan-t5-xl",
-"google/flan-t5-xxl" : "google/flan-t5-xxl"
+    "flan-t5-small": "google/flan-t5-small",
+    "flan-t5-base" : "google/flan-t5-base",
+    "flan-t5-large": "google/flan-t5-large",
+    "flan-t5-xl"   : "google/flan-t5-xl",
+    "flan-t5-xxl"  : "google/flan-t5-xxl"
 }
 
 class Engine:
@@ -52,16 +52,17 @@ class Engine:
             self.model = LlamaForCausalLM.from_pretrained(
                 "chainyo/alpaca-lora-7b",
                 load_in_8bit=True,
+                cache_dir="./.cache",
                 torch_dtype=torch.float16,
                 device_map="auto",
-            ).to(device)
+            )
 
         if model_name.startswith("t5"):
             self.engine = model_name
             self.tokenizer = T5Tokenizer.from_pretrained(t5_dic[model_name])
             self.model = T5ForConditionalGeneration.from_pretrained(t5_dic[model_name]).to(device)
 
-        if model_name.startswith("google/flan-t5"):
+        if model_name.startswith("flan-t5"):
             self.engine = model_name
             self.tokenizer = T5Tokenizer.from_pretrained(flan_t5_dic[model_name], truncation=True, model_max_length=5642)
             self.model = T5ForConditionalGeneration.from_pretrained(flan_t5_dic[model_name]).to(device)
@@ -85,7 +86,11 @@ class Engine:
 
         # Decode the generated tokens into text
         output_text = self.tokenizer.decode(output_ids[0], skip_special_tokens=True)
-        completed_text = output_text[len(prompt):].lstrip()
+        if 't5' in self.engine:
+            completed_text = output_text
+        else:
+            completed_text = output_text[len(prompt):].lstrip()
+
         return completed_text
 
     def check_prompt_length(self, prompt, max_tokens=64):

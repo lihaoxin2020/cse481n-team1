@@ -3,7 +3,7 @@ from load_model import Engine
 from tqdm import tqdm
 import numpy as np
 from scipy.special import softmax
-import tiktoken
+# import tiktoken
 import argparse
 from sklearn.metrics import brier_score_loss
 
@@ -37,7 +37,8 @@ def main():
     with open(args.demo_path, 'r') as fh:
         demo_data = json.load(fh)
     engine = Engine(args.engine)
-    tokenizer = tiktoken.encoding_for_model(args.engine)
+    # tokenizer = tiktoken.encoding_for_model(args.engine)
+    tokenizer = engine.tokenizer
     abs_golds, abs_probs, preds, golds = [], [], [], []
     for d in tqdm(test_data):
         context, question, choices, answer = d['context'], d['question'], d['choices'], d['answer']

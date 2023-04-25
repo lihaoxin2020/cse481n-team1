@@ -5,9 +5,10 @@ from transformers import (
     LlamaForCausalLM,
     T5Tokenizer,
     T5ForConditionalGeneration
-    )
+)
 import torch.nn.functional as F
 import torch
+import sys
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -30,19 +31,20 @@ opt_dic = {
 
 t5_dic = {
     "t5-small": "t5-small",
-    "t5-base" : "t5-base",
+    "t5-base": "t5-base",
     "t5-large": "t5-large",
-    "t5-3b"   : "t5-3b",
-    "t5-11b"  : "t5-11b"
+    "t5-3b": "t5-3b",
+    "t5-11b": "t5-11b"
 }
 
 flan_t5_dic = {
     "flan-t5-small": "google/flan-t5-small",
-    "flan-t5-base" : "google/flan-t5-base",
+    "flan-t5-base": "google/flan-t5-base",
     "flan-t5-large": "google/flan-t5-large",
-    "flan-t5-xl"   : "google/flan-t5-xl",
-    "flan-t5-xxl"  : "google/flan-t5-xxl"
+    "flan-t5-xl": "google/flan-t5-xl",
+    "flan-t5-xxl": "google/flan-t5-xxl"
 }
+
 
 class Engine:
     def __init__(self, model_name):
@@ -64,7 +66,8 @@ class Engine:
 
         if model_name.startswith("flan-t5"):
             self.engine = model_name
-            self.tokenizer = T5Tokenizer.from_pretrained(flan_t5_dic[model_name], truncation=True, model_max_length=5642)
+            self.tokenizer = T5Tokenizer.from_pretrained(flan_t5_dic[model_name], truncation=True,
+                                                         model_max_length=5642)
             self.model = T5ForConditionalGeneration.from_pretrained(flan_t5_dic[model_name]).to(device)
 
         if model_name.startswith("opt"):
@@ -72,10 +75,9 @@ class Engine:
             self.tokenizer = AutoTokenizer.from_pretrained(opt_dic[model_name], truncation=True, model_max_length=3189)
             self.model = OPTForCausalLM.from_pretrained(opt_dic[model_name]).to(device)
 
-        if torch.__version__ >= "2":
+        if torch.__version__ >= "2" and sys.platform != "win32":
             self.model = torch.compile(self.model)
         self.model.eval()
-
 
     def complete(self, prompt, max_tokens=64):
 
@@ -96,11 +98,10 @@ class Engine:
     def check_prompt_length(self, prompt, max_tokens=64):
 
         if (self.engine.startswith("t5-small")):
-          prompt_length = len(self.tokenizer.encode(prompt))
-          if prompt_length + max_tokens >= 3189:  # Prompt is too long
-              return True
-          return False
-
+            prompt_length = len(self.tokenizer.encode(prompt))
+            if prompt_length + max_tokens >= 3189:  # Prompt is too long
+                return True
+            return False
 
         prompt_length = len(self.tokenizer.encode(prompt))
         if prompt_length + max_tokens >= 2048:  # Prompt is too long
@@ -115,6 +116,6 @@ class Engine:
         log_probs = F.log_softmax(logits, dim=-1)
 
         # Compute the sum of the log-probabilities from the num_tokens token to the end
-        partial_log_likelihood = log_probs[0, num_tokens:-1, :].gather(1, input_ids[:, num_tokens + 1:].unsqueeze(-1)).sum().item()
+        partial_log_likelihood = log_probs[:, -num_tokens:, :].gather(-1, input_ids[:, -num_tokens:].unsqueeze(-1))
 
-        return partial_log_likelihood
+        return partial_log_likelihood.sum().item()

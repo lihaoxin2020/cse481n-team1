@@ -1,5 +1,6 @@
 from transformers import (
     AutoTokenizer,
+    AutoModelForCausalLM,
     OPTForCausalLM,
     LlamaTokenizer,
     LlamaForCausalLM,
@@ -27,6 +28,11 @@ opt_dic = {
     "opt-13b": "facebook/opt-13b",
     "opt-30b": "facebook/opt-30b",
     "opt-66b": "facebook/opt-66b"
+}
+
+opt_iml_dic = {
+    "opt-iml-1.3b": "facebook/opt-iml-1.3b",
+    "opt-iml-30b": "facebook/opt-iml-30b"
 }
 
 t5_dic = {
@@ -64,16 +70,25 @@ class Engine:
             self.tokenizer = T5Tokenizer.from_pretrained(t5_dic[model_name])
             self.model = T5ForConditionalGeneration.from_pretrained(t5_dic[model_name]).to(device)
 
-        if model_name.startswith("flan-t5"):
+        elif model_name.startswith("flan-t5"):
             self.engine = model_name
             self.tokenizer = T5Tokenizer.from_pretrained(flan_t5_dic[model_name], truncation=True,
                                                          model_max_length=5642)
             self.model = T5ForConditionalGeneration.from_pretrained(flan_t5_dic[model_name]).to(device)
+        
+        elif model_name.startswith("opt-iml"):
+            self.engine = model_name
+            self.tokenizer = AutoTokenizer.from_pretrained(opt_iml_dic[model_name], use_fast = False)
+            self.model = AutoModelForCausalLM.from_pretrained(opt_iml_dic[model_name]).to(device)
 
-        if model_name.startswith("opt"):
+        elif model_name.startswith("opt"):
             self.engine = model_name
             self.tokenizer = AutoTokenizer.from_pretrained(opt_dic[model_name], truncation=True, model_max_length=3189)
             self.model = OPTForCausalLM.from_pretrained(opt_dic[model_name]).to(device)
+        
+        else:
+            print("model not recognised")
+            
 
         if torch.__version__ >= "2" and sys.platform != "win32":
             self.model = torch.compile(self.model)

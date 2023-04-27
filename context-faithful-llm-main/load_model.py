@@ -51,14 +51,30 @@ flan_t5_dic = {
     "flan-t5-xxl": "google/flan-t5-xxl"
 }
 
+dolly_dic = {
+    "dolly-7b": "databricks/dolly-v2-7b",
+    "dolly-13b": "databricks/dolly-v2-13b",
+}
+
 
 class Engine:
     def __init__(self, model_name):
+        if model_name.startswith("dolly"):
+            self.engine = model_name
+            self.tokenizer = AutoTokenizer.from_pretrained(dolly_dic[model_name])
+            self.model = AutoModelForCausalLM.from_pretrained(
+                dolly_dic[model_name],
+                load_in_8bit=True,
+                cache_dir="./.cache",
+                torch_dtype=torch.float16,
+                device_map="auto",
+            )
+
         if model_name.startswith("alpaca"):
             self.engine = model_name
-            self.tokenizer = LlamaTokenizer.from_pretrained("chainyo/alpaca-lora-7b")
+            self.tokenizer = LlamaTokenizer.from_pretrained("chavinlo/alpaca-native")
             self.model = LlamaForCausalLM.from_pretrained(
-                "chainyo/alpaca-lora-7b",
+                "chavinlo/alpaca-native",
                 load_in_8bit=True,
                 cache_dir="./.cache",
                 torch_dtype=torch.float16,
@@ -75,23 +91,22 @@ class Engine:
             self.tokenizer = T5Tokenizer.from_pretrained(flan_t5_dic[model_name], truncation=True,
                                                          model_max_length=5642)
             self.model = T5ForConditionalGeneration.from_pretrained(flan_t5_dic[model_name]).to(device)
-        
+
         elif model_name.startswith("opt-iml"):
             self.engine = model_name
-            self.tokenizer = AutoTokenizer.from_pretrained(opt_iml_dic[model_name], use_fast = False)
+            self.tokenizer = AutoTokenizer.from_pretrained(opt_iml_dic[model_name], use_fast=False)
             self.model = AutoModelForCausalLM.from_pretrained(opt_iml_dic[model_name]).to(device)
 
         elif model_name.startswith("opt"):
             self.engine = model_name
             self.tokenizer = AutoTokenizer.from_pretrained(opt_dic[model_name], truncation=True, model_max_length=3189)
             self.model = OPTForCausalLM.from_pretrained(opt_dic[model_name]).to(device)
-        
+
         else:
             print("model not recognised")
-            
 
-        if torch.__version__ >= "2" and sys.platform != "win32":
-            self.model = torch.compile(self.model)
+        # if torch.__version__ >= "2" and sys.platform != "win32":
+        #     self.model = torch.compile(self.model)
         self.model.eval()
 
     def complete(self, prompt, max_tokens=64):
@@ -131,6 +146,6 @@ class Engine:
         log_probs = F.log_softmax(logits, dim=-1)
 
         # Compute the sum of the log-probabilities from the num_tokens token to the end
-        partial_log_likelihood = log_probs[:, -num_tokens:, :].gather(-1, input_ids[:, -num_tokens:].unsqueeze(-1))
+        partial_log_likelihood = log_probs[:, -num_tokens+1:, :].gather(-1, input_ids[:, -num_tokens+1:].unsqueeze(-1))
 
         return partial_log_likelihood.sum().item()

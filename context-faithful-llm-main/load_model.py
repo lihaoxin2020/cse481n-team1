@@ -125,8 +125,10 @@ class Engine:
 
     def get_prob(self, prompt, num_tokens):
         input_ids = self.tokenizer.encode(prompt, return_tensors="pt").to(device)
+        decoder_input_ids = self.tokenizer.encode(prompt, return_tensors="pt").to(device)
+        decoder_input_ids = self.model._shift_right(decoder_input_ids)
         with torch.no_grad():
-            outputs = self.model(input_ids)
+            outputs = self.model(input_ids = input_ids, decoder_input_ids=decoder_input_ids)
             logits = outputs.logits
         log_probs = F.log_softmax(logits, dim=-1)
 

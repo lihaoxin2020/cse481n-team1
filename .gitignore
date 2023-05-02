@@ -1,6 +1,9 @@
 /context-faithful-llm-main/.cache/
 /offload/
-/datasets/
+/datasets/*
+/.idea/
 
 *.txt
 *.log
+*.pyc
+.DS_Store

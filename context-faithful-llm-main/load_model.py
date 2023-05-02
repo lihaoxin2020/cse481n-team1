@@ -10,6 +10,7 @@ from transformers import (
 import torch.nn.functional as F
 import torch
 import sys
+from instruct_pipeline import *
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -54,11 +55,44 @@ flan_t5_dic = {
 
 class Engine:
     def __init__(self, model_name):
+        if model_name.startswith("dolly"):
+            self.engine = model_name
+            self.tokenizer = AutoTokenizer.from_pretrained(
+                "databricks/dolly-v2-12b",
+                padding_side="left"
+            )
+            self.model = AutoModelForCausalLM.from_pretrained(
+                "databricks/dolly-v2-12b",
+                load_in_8bit=True,
+                cache_dir="./.cache",
+                device_map="auto",
+                torch_dtype=torch.bfloat16
+            )
+            self.generate_text = InstructionTextGenerationPipeline(
+                model=self.model,
+                do_sample=False,
+                tokenizer=self.tokenizer,
+                top_k=1,
+                output_scores=True,
+                return_dict_in_generate=True,
+            )
+
         if model_name.startswith("alpaca"):
             self.engine = model_name
-            self.tokenizer = LlamaTokenizer.from_pretrained("chainyo/alpaca-lora-7b")
+            self.tokenizer = LlamaTokenizer.from_pretrained("chavinlo/alpaca-native")
             self.model = LlamaForCausalLM.from_pretrained(
-                "chainyo/alpaca-lora-7b",
+                "chavinlo/alpaca-native",
+                load_in_8bit=True,
+                cache_dir="./.cache",
+                torch_dtype=torch.float16,
+                device_map="auto",
+            )
+
+        if model_name.startswith("llama"):
+            self.engine = model_name
+            self.tokenizer = LlamaTokenizer.from_pretrained("decapoda-research/llama-7b-hf")
+            self.model = LlamaForCausalLM.from_pretrained(
+                "decapoda-research/llama-7b-hf",
                 load_in_8bit=True,
                 cache_dir="./.cache",
                 torch_dtype=torch.float16,
@@ -72,26 +106,34 @@ class Engine:
 
         elif model_name.startswith("flan-t5"):
             self.engine = model_name
-            self.tokenizer = T5Tokenizer.from_pretrained(flan_t5_dic[model_name], truncation=True,
-                                                         model_max_length=5642)
-            self.model = T5ForConditionalGeneration.from_pretrained(flan_t5_dic[model_name]).to(device)
-        
+            self.tokenizer = T5Tokenizer.from_pretrained(
+                flan_t5_dic[model_name],
+                # truncation=True,
+                # model_max_length=5642
+            )
+            self.model = T5ForConditionalGeneration.from_pretrained(
+                flan_t5_dic[model_name],
+                load_in_8bit=True,
+                cache_dir="./.cache",
+                torch_dtype=torch.float16,
+                device_map="auto",
+            )
+
         elif model_name.startswith("opt-iml"):
             self.engine = model_name
-            self.tokenizer = AutoTokenizer.from_pretrained(opt_iml_dic[model_name], use_fast = False)
+            self.tokenizer = AutoTokenizer.from_pretrained(opt_iml_dic[model_name], use_fast=False)
             self.model = AutoModelForCausalLM.from_pretrained(opt_iml_dic[model_name]).to(device)
 
         elif model_name.startswith("opt"):
             self.engine = model_name
             self.tokenizer = AutoTokenizer.from_pretrained(opt_dic[model_name], truncation=True, model_max_length=3189)
             self.model = OPTForCausalLM.from_pretrained(opt_dic[model_name]).to(device)
-        
+
         else:
             print("model not recognised")
-            
 
-        if torch.__version__ >= "2" and sys.platform != "win32":
-            self.model = torch.compile(self.model)
+        # if torch.__version__ >= "2" and sys.platform != "win32":
+        #     self.model = torch.compile(self.model)
         self.model.eval()
 
     def complete(self, prompt, max_tokens=64):
@@ -99,12 +141,16 @@ class Engine:
         input_ids = self.tokenizer.encode(prompt, return_tensors="pt").to(device)
 
         with torch.no_grad():
-            output_ids = self.model.generate(input_ids, max_new_tokens=max_tokens, num_return_sequences=1)
+            if "dolly" in self.engine:
+                completed_text = self.generate_text(prompt)[0]["generated_text"]
+                return completed_text
+            else:
+                output_ids = self.model.generate(input_ids, max_new_tokens=max_tokens, num_return_sequences=1)
 
         # Decode the generated tokens into text
         output_text = self.tokenizer.decode(output_ids[0], skip_special_tokens=True)
         if 't5' in self.engine:
-            completed_text = output_text
+            completed_text = output_text.lstrip()
         else:
             completed_text = output_text[len(prompt):].lstrip()
 
@@ -123,12 +169,27 @@ class Engine:
             return True
         return False
 
-    def get_prob(self, prompt, num_tokens):
-        input_ids = self.tokenizer.encode(prompt, return_tensors="pt").to(device)
-        decoder_input_ids = self.tokenizer.encode(prompt, return_tensors="pt").to(device)
-        decoder_input_ids = self.model._shift_right(decoder_input_ids)
+    def get_prob(self, prompt, num_tokens, choice=''):
+        if "dolly" in self.engine:
+            input_text = self.generate_text.preprocess(prompt)['prompt_text'] + choice
+            input_ids = self.tokenizer.encode(input_text, return_tensors="pt").to(device)
+            # input_ids.pop('prompt_text')
+            # input_ids.pop('instruction_text')
+        else:
+            input_ids = self.tokenizer.encode(prompt, return_tensors="pt").to(device)
+
+        if 't5' in self.engine:
+            # decoder_input_ids = self.tokenizer.encode(prompt, return_tensors="pt").to(device)
+            # decoder_input_ids = self.model._shift_right(decoder_input_ids)
+            choice_ids = self.tokenizer.encode(choice, return_tensors='pt').to(device)
+            choice_ids = self.model._shift_right(choice_ids)
         with torch.no_grad():
-            outputs = self.model(input_ids = input_ids, decoder_input_ids=decoder_input_ids)
+            if 't5' in self.engine:
+                outputs = self.model(input_ids=input_ids, decoder_input_ids=choice_ids)
+            else:
+                outputs = self.model(input_ids=input_ids)
+                # outputs = self.model(**input_ids)
+
             logits = outputs.logits
         log_probs = F.log_softmax(logits, dim=-1)
 

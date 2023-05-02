@@ -32,8 +32,10 @@ opt_dic = {
 }
 
 opt_iml_dic = {
+    "opt-iml-30b": "facebook/opt-iml-30b",
+    "opt-iml-max-30b": "facebook/opt-iml-max-30b",
     "opt-iml-1.3b": "facebook/opt-iml-1.3b",
-    "opt-iml-30b": "facebook/opt-iml-30b"
+    "opt-iml-max-1.3b": "facebook/opt-iml-max-1.3b"
 }
 
 t5_dic = {

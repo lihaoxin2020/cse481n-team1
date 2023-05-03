@@ -67,7 +67,7 @@ with gzip.open(orig_path, "r") as inf:
     header = json.loads(inf.readline())
     for i, line in enumerate(inf):
         datum = json.loads(line)
-        uid = datum['qid']
+        uid = datum['uid']
         if uid in uids_set:
             context = datum['context'].replace('<P>', '').replace('</P>', '').strip()
             question = datum['query'] + '?'

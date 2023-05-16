@@ -100,6 +100,7 @@ def main():
         # Logs
         ce['prediction'] = pred
         ce['orig_answer'] = orig_answer
+        ce['gold_answer'] = answer
         ce['schema'] = args.schema
         ce['demo_mode'] = args.demo_mode
 

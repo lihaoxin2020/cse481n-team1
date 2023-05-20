@@ -42,6 +42,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--orig_path", default="./datasets/nq/orig_dev_filtered.json", type=str)
     parser.add_argument("--counter_path", default="./datasets/nq/conflict_dev_filtered.json", type=str)
+    parser.add_argument("--ic_demo_path", default="./datasets/nq/orig_dev_filtered.json", type=str)
+    parser.add_argument("--ico_demo_path", default="./datasets/nq/orig_dev_filtered.json", type=str)
     parser.add_argument("--engine", default="opt-1.3b", type=str)
     parser.add_argument("--schema", default="base", type=str, help="Choose from the following prompting templates: base, attr, instr, opin, instr+opin.")
     parser.add_argument("--demo_mode", default="none", help="Choose from the following demonstrations: none, original, counter.")
@@ -59,6 +61,12 @@ def main():
         orig_examples = json.load(fh)
     with open(args.counter_path, 'r') as fh:
         counter_examples = json.load(fh)
+
+    with open(args.ic_demo_path, 'r') as fh:
+        ic_demo = json.load(fh)
+    with open(args.ico_demo_path, 'r') as fh:
+        ico_demo = json.load(fh)
+
     if (args.max_examples > 0):
         orig_examples = orig_examples[:args.max_examples]
         counter_examples = counter_examples[:args.max_examples]
@@ -82,9 +90,11 @@ def main():
         if args.demo_mode == 'none':
             demos = []
         elif args.demo_mode == 'counter':
-            demos = ce['ic_examples']
+            # demos = ce['ic_examples']
+            demos = ic_demo
         elif args.demo_mode == 'original':
-            demos = ce['ico_examples']
+            # demos = ce['ico_examples']
+            demos = ico_demo
         for num_demos in range(args.num_demos, 1, -1):  # Use fewer demos if prompt is too long
             prompt = qa_to_prompt(query, context, schema=args.schema, demos=demos, num_demos=num_demos)
             if not engine.check_prompt_length(prompt):
